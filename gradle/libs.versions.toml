@@ -1,0 +1,157 @@
+[versions]
+agp = "8.9.3"
+amplituda = "2.2.2"
+androidSpinkit = "1.4.0"
+applovin = "13.3.1.0"
+circleimageview = "3.1.0"
+datastorePreferences = "1.1.4"
+draggableview = "1.0.1"
+exoplayerCore = "2.19.1"
+facebook = "6.20.0.0"
+ffmpegKitFull = "6.0.LTS"
+kotlin = "2.1.0"
+coreKtx = "1.15.0"
+junit = "4.13.2"
+junitVersion = "1.2.1"
+espressoCore = "3.6.1"
+appcompat = "1.7.0"
+lottie = "6.6.3"
+material = "1.12.0"
+activity = "1.10.1"
+constraintlayout = "2.2.1"
+
+adjustAndroidHuaweiReferrer = "5.2.0"
+androidDownloader = "3.0.1"
+androidImageCropper = "4.6.0"
+billing = "7.1.1"
+fancyshowcaseview = "1.3.9"
+firebaseBom = "33.15.0"
+firebaseCoreVersion = "21.1.1"
+appUpdateKtx = "2.1.0"
+kotlinxSerializationJson = "1.6.3"
+dotsindicator = "5.1.0"
+flagkitAndroid = "1.0.2"
+eventbus = "3.3.1"
+fragmentKtx = "1.8.6"
+glide = "4.16.0"
+gson = "2.11.0"
+installreferrerVersion = "2.2"
+lottieVersion = "6.6.3"
+hiltAndroid = "2.54"
+mintegral = "16.9.71.0"
+numberPicker = "2.4.13"
+pangle = "7.2.0.6.0"
+playServicesAds = "24.4.0"
+playServicesAdsIdentifier = "18.2.0"
+recyclerview = "1.4.0"
+retrofit = "2.11.0"
+roundedimageview = "2.3.0"
+sdpAndroid = "1.1.1"
+shimmer = "0.5.0"
+simpleratingbar = "1.5.1"
+adjustAndroid = "5.4.0"
+lifecycleProcess = "2.8.7"
+media3Exoplayer = "1.5.1"
+sspAndroid = "1.1.1"
+swiperefreshlayout = "1.2.0-beta01"
+swiperefreshlayoutVersion = "1.2.0-beta01"
+timber = "5.0.1"
+verticalseekbar = "1.0.0"
+vungle = "7.5.0.0"
+workRuntimeKtx = "2.10.0"
+roomRuntime = "2.7.1"
+playServicesAdsApi = "24.4.0"
+navigationFragmentKtx = "2.6.0"
+navigationUiKtx = "2.6.0"
+core = "1.48.0"
+workRuntimeKtxVersion = "2.10.1"
+
+[libraries]
+amplituda = { module = "com.github.lincollincol:amplituda", version.ref = "amplituda" }
+android-spinkit = { module = "com.github.ybq:Android-SpinKit", version.ref = "androidSpinkit" }
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+androidx-datastore-preferences = { module = "androidx.datastore:datastore-preferences", version.ref = "datastorePreferences" }
+androidx-swiperefreshlayout = { module = "androidx.swiperefreshlayout:swiperefreshlayout", version.ref = "swiperefreshlayoutVersion" }
+androidx-work-runtime-ktx = { module = "androidx.work:work-runtime-ktx", version.ref = "workRuntimeKtxVersion" }
+applovin = { module = "com.google.ads.mediation:applovin", version.ref = "applovin" }
+circleimageview = { module = "de.hdodenhof:circleimageview", version.ref = "circleimageview" }
+draggableview = { module = "com.github.hyuwah:DraggableView", version.ref = "draggableview" }
+exoplayer = { module = "com.google.android.exoplayer:exoplayer", version.ref = "exoplayerCore" }
+exoplayer-core = { module = "com.google.android.exoplayer:exoplayer-core", version.ref = "exoplayerCore" }
+exoplayer-ui = { module = "com.google.android.exoplayer:exoplayer-ui", version.ref = "exoplayerCore" }
+facebook = { module = "com.google.ads.mediation:facebook", version.ref = "facebook" }
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
+androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
+androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
+lottie-v663 = { module = "com.airbnb.android:lottie", version.ref = "lottie" }
+material = { group = "com.google.android.material", name = "material", version.ref = "material" }
+androidx-activity = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
+billing = { module = "com.android.billingclient:billing", version.ref = "billing" }
+compiler = { module = "com.github.bumptech.glide:compiler", version.ref = "glide" }
+dotsindicator = { module = "com.tbuonomo:dotsindicator", version.ref = "dotsindicator" }
+androidx-room-compiler = { module = "androidx.room:room-compiler", version.ref = "roomRuntime" }
+androidx-room-ktx = { module = "androidx.room:room-ktx", version.ref = "roomRuntime" }
+androidx-room-runtime = { module = "androidx.room:room-runtime", version.ref = "roomRuntime" }
+androidx-activity-ktx = { group = "androidx.activity", name = "activity", version.ref = "activity" }
+androidx-fragment-ktx = { module = "androidx.fragment:fragment-ktx", version.ref = "fragmentKtx" }
+
+app-update = { module = "com.google.android.play:app-update", version.ref = "appUpdateKtx" }
+app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdateKtx" }
+android-installreferrer = { module = "com.android.installreferrer:installreferrer", version.ref = "installreferrerVersion" }
+adjust-android-huawei-referrer = { module = "com.adjust.sdk:adjust-android-huawei-referrer", version.ref = "adjustAndroidHuaweiReferrer" }
+androidx-recyclerview = { module = "androidx.recyclerview:recyclerview", version.ref = "recyclerview" }
+
+adjust-android-webbridge = { module = "com.adjust.sdk:adjust-android-webbridge", version.ref = "adjustAndroid" }
+fancyshowcaseview = { module = "com.github.faruktoptas:FancyShowCaseView", version.ref = "fancyshowcaseview" }
+firebase-analytics-ktx = { module = "com.google.firebase:firebase-analytics-ktx" }
+firebase-bom = { module = "com.google.firebase:firebase-bom", version.ref = "firebaseBom" }
+firebase-config-ktx = { module = "com.google.firebase:firebase-config-ktx" }
+firebase-analytics = { module = "com.google.firebase:firebase-analytics" }
+firebase-crashlytics-ktx = { module = "com.google.firebase:firebase-crashlytics-ktx" }
+firebase-crashlytics-ndk = { module = "com.google.firebase:firebase-crashlytics-ndk" }
+flagkit-android = { module = "com.github.murgupluoglu:flagkit-android", version.ref = "flagkitAndroid" }
+eventbus = { module = "org.greenrobot:eventbus", version.ref = "eventbus" }
+glide = { module = "com.github.bumptech.glide:glide", version.ref = "glide" }
+google-firebase-core = { module = "com.google.firebase:firebase-core", version.ref = "firebaseCoreVersion" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinxSerializationJson" }
+lottie-v652 = { module = "com.airbnb.android:lottie", version.ref = "lottieVersion" }
+
+hilt-android = { module = "com.google.dagger:hilt-android", version.ref = "hiltAndroid" }
+hilt-compiler = { module = "com.google.dagger:hilt-compiler", version.ref = "hiltAndroid" }
+
+mintegral = { module = "com.google.ads.mediation:mintegral", version.ref = "mintegral" }
+number-picker = { module = "io.github.ShawnLin013:number-picker", version.ref = "numberPicker" }
+pangle = { module = "com.google.ads.mediation:pangle", version.ref = "pangle" }
+play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+play-services-ads-identifier = { module = "com.google.android.gms:play-services-ads-identifier", version.ref = "playServicesAdsIdentifier" }
+
+converter-gson = { module = "com.squareup.retrofit2:converter-gson", version.ref = "retrofit" }
+retrofit = { module = "com.squareup.retrofit2:retrofit", version.ref = "retrofit" }
+
+roundedimageview = { module = "com.makeramen:roundedimageview", version.ref = "roundedimageview" }
+sdp-android = { module = "com.intuit.sdp:sdp-android", version.ref = "sdpAndroid" }
+shimmer = { module = "com.facebook.shimmer:shimmer", version.ref = "shimmer" }
+simpleratingbar = { module = "com.github.ome450901:SimpleRatingBar", version.ref = "simpleratingbar" }
+adjust-android = { module = "com.adjust.sdk:adjust-android", version.ref = "adjustAndroid" }
+androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycleProcess" }
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "media3Exoplayer" }
+ssp-android = { module = "com.intuit.ssp:ssp-android", version.ref = "sspAndroid" }
+timber = { module = "com.jakewharton.timber:timber", version.ref = "timber" }
+vanniktech-android-image-cropper = { module = "com.vanniktech:android-image-cropper", version.ref = "androidImageCropper" }
+play-services-ads-api = { group = "com.google.android.gms", name = "play-services-ads-api", version.ref = "playServicesAdsApi" }
+androidx-navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "navigationFragmentKtx" }
+androidx-navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "navigationUiKtx" }
+androidx-media3-exoplayer-dash = { module = "androidx.media3:media3-exoplayer-dash", version.ref = "media3Exoplayer" }
+androidx-media3-ui = { module = "androidx.media3:media3-ui", version.ref = "media3Exoplayer" }
+ffmpeg-kit-full = { module = "com.arthenica:ffmpeg-kit-full", version.ref = "ffmpegKitFull" }
+verticalseekbar = { module = "com.h6ah4i.android.widget.verticalseekbar:verticalseekbar", version.ref = "verticalseekbar" }
+vungle = { module = "com.google.ads.mediation:vungle", version.ref = "vungle" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+hilt-android = { id = "com.google.dagger.hilt.android", version.ref = "hiltAndroid" }
+
