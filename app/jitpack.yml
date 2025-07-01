@@ -1,5 +1,0 @@
-jdk:
-  - 17
-
-install:
-  - ./gradlew :billing_library:assembleRelease

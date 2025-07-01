@@ -1,7 +1,11 @@
 plugins {
     id 'com.android.library'
     alias(libs.plugins.kotlin.android)
+    id("maven-publish")
 }
+
+group = "com.github.ITKenTo"
+version = "1.0.0"
 
 android {
     namespace 'com.src.billing_library'
@@ -21,11 +25,18 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
+
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'
+    }
+
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
     }
 }
 
@@ -35,5 +46,15 @@ dependencies {
     implementation libs.billing
 }
 
-group = "com.github.ITKenTo"
-version = "1.0.0"
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
+                from components.release
+                groupId = group
+                artifactId = 'billing_library'
+                version = version
+            }
+        }
+    }
+}
