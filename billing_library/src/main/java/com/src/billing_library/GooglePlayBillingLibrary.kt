@@ -14,6 +14,7 @@ import com.android.billingclient.api.ProductDetails
 import com.android.billingclient.api.Purchase
 import com.android.billingclient.api.PurchasesUpdatedListener
 import com.android.billingclient.api.QueryProductDetailsParams
+import com.android.billingclient.api.QueryProductDetailsResult
 import com.android.billingclient.api.QueryPurchasesParams
 import com.src.billing_library.callback.ConnectionListener
 import com.src.billing_library.callback.OnPurchasesUpdatedListener
@@ -119,7 +120,8 @@ class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
                 }
                 val builder = QueryProductDetailsParams.newBuilder().setProductList(params).build()
                 billingClient.queryProductDetailsAsync(builder) { _, productDetails ->
-                    subsProductDetails = ArrayList(productDetails)
+                    subsProductDetails = ArrayList(productDetails.productDetailsList)
+
                     latch.countDown() // Decrement the latch count
                 }
             }.start()
@@ -136,7 +138,7 @@ class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
                 }
                 val builder = QueryProductDetailsParams.newBuilder().setProductList(params).build()
                 billingClient.queryProductDetailsAsync(builder) { _, productDetails ->
-                    inAppProductDetails = ArrayList(productDetails)
+                    inAppProductDetails = ArrayList(productDetails.productDetailsList)
                     latch.countDown() // Decrement the latch count
                 }
             }.start()
@@ -308,4 +310,6 @@ class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
         billingClient.endConnection()
     }
 
+    private fun BillingResult.isResponseOk(): Boolean =
+        responseCode == BillingClient.BillingResponseCode.OK
 }
