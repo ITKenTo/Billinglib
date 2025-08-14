@@ -46,15 +46,15 @@ dependencies {
     implementation libs.billing
 }
 
-afterEvaluate {
-    publishing {
-        publications {
-            release(MavenPublication) {
+publishing {
+    publications {
+        release(MavenPublication) {
+            afterEvaluate {
                 from components.release
-                groupId = group
-                artifactId = 'billing_library'
-                version = version
             }
+            groupId = group
+            artifactId = "billing-library" // tên thư viện sẽ hiển thị trên JitPack
+            version = version
         }
     }
 }
