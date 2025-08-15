@@ -4,9 +4,6 @@ plugins {
     id("maven-publish")
 }
 
-group = "com.github.ITKenTo"
-version = "1.0.0"
-
 android {
     namespace 'com.src.billing_library'
     compileSdk 35
@@ -46,15 +43,15 @@ dependencies {
     implementation libs.billing
 }
 
-publishing {
-    publications {
-        release(MavenPublication) {
-            afterEvaluate {
+afterEvaluate {
+    publishing {
+        publications {
+            release(MavenPublication) {
                 from components.release
+                groupId = "com.github.ITKenTo"
+                artifactId = "billing-library"
+                version = "1.0.0"
             }
-            groupId = group
-            artifactId = "billing-library" // tên thư viện sẽ hiển thị trên JitPack
-            version = version
         }
     }
 }
