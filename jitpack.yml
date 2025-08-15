@@ -1,5 +1,9 @@
 jdk:
   - openjdk17
 
-install:
-  - ./gradlew :billing_library:publishToMavenLocal
+#install:
+#  - ./gradlew :billing_library:publishToMavenLocal
+#
+#build:
+#  commands:
+#    - ./gradlew :billing_library:assembleRelease

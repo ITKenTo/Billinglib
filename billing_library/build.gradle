@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace 'com.src.billing_library'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         minSdk 22
@@ -29,12 +29,6 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
-
-    publishing {
-        singleVariant("release") {
-            withSourcesJar()
-        }
-    }
 }
 
 dependencies {
@@ -46,11 +40,15 @@ dependencies {
 afterEvaluate {
     publishing {
         publications {
+            // Creates a Maven publication called "release".
             release(MavenPublication) {
+                // Applies the component for the release build variant.
                 from components.release
-                groupId = "com.github.ITKenTo"
-                artifactId = "billing-library"
-                version = "1.0.0"
+
+                // You can then customize attributes of the publication as shown below.
+                groupId = 'com.github.ITKenTo'
+                artifactId = 'billing-library'
+                version = '1.0.0'
             }
         }
     }
