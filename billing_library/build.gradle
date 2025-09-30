@@ -9,7 +9,7 @@ version = "1.0.0"
 
 android {
     namespace 'com.src.billing_library'
-    compileSdk 35
+    compileSdk 36
 
     defaultConfig {
         minSdk 22

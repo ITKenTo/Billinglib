@@ -23,222 +23,378 @@ import com.src.billing_library.model.SaleProductDetail.Companion.toSaleProductDe
 import com.src.billing_library.model.SalePurchase
 import com.src.billing_library.model.SalePurchase.Companion.toSalePurchase
 import com.src.billing_library.model.SubscriptionOfferDetail
-import java.util.concurrent.CountDownLatch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlinx.coroutines.withContext
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.CopyOnWriteArrayList
 
+/**
+ * GooglePlayBillingLibrary.kt
+ *
+ * Created by KentoDev in 2025
+ *
+ * A wrapper around Google Play BillingClient that:
+ * - Manages the billing service connection lifecycle
+ * - Queries product details (in-app products & subscriptions)
+ * - Queries already owned purchases
+ * - Handles purchase flows and purchase updates
+ * - Acknowledges or consumes completed transactions
+ *
+ * All public APIs are coroutine-based (suspend functions) → non-blocking and safer for UI.
+ *
+ * Logging guideline:
+ * - Log.d(TAG, "...") for state changes (connection, queries)
+ * - Log.i(TAG, "...") for successful operations
+ * - Log.w(TAG, "...") for recoverable issues
+ * - Log.e(TAG, "...") for errors or unexpected behavior
+ *
+ * Note: Never log sensitive data such as purchaseToken in production builds.
+ */
 class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
+    companion object {
+        private const val TAG = "GooglePlayBilling"
+    }
 
     /**
      * K is purchaseToken
      * V is Purchase
      * **/
-    private val purchases = HashMap<String, Purchase>()
+    private val purchases = ConcurrentHashMap<String, Purchase>()
 
     /**
      * K is productId
      * V is ProductDetails
      * **/
-    private val detailProducts = HashMap<String, ProductDetails>()
+    private val detailProducts = ConcurrentHashMap<String, ProductDetails>()
 
-    private val listeners = ArrayList<OnPurchasesUpdatedListener>()
+    private val listeners = CopyOnWriteArrayList<OnPurchasesUpdatedListener>()
+
+    // Coroutine scope for async operations
+    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+
+    @Volatile
+    var isConnected = false
 
     private val purchasesListener = PurchasesUpdatedListener { billingResult, purchases ->
-        when {
-            billingResult.responseCode == BillingClient.BillingResponseCode.OK && purchases != null -> {
-                purchases.forEach { purchase ->
-                    this.purchases[purchase.purchaseToken] = purchase
-                    listeners.forEach { ls ->
-                        ls.onSucceeded(purchase.toSalePurchase())
-                    }
-                }
-            }
-
-            billingResult.responseCode == BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
-                listeners.forEach { ls ->
-                    ls.onFailed(PurchaseResponseCode.ITEM_ALREADY_OWNED)
-                }
-            }
-
-            billingResult.responseCode == BillingClient.BillingResponseCode.USER_CANCELED -> {
-                listeners.forEach { ls ->
-                    ls.onFailed(PurchaseResponseCode.USER_CANCELED)
-                }
-            }
-
-            else -> {
-                listeners.forEach { ls ->
-                    ls.onFailed(PurchaseResponseCode.ERROR)
-                }
-            }
-        }
+        handlePurchasesUpdate(billingResult, purchases)
     }
 
     private val billingClient: BillingClient =
-        BillingClient.newBuilder(context).setListener(purchasesListener).enablePendingPurchases(
-            PendingPurchasesParams.newBuilder().enableOneTimeProducts().build()
-        ).build()
+        BillingClient.newBuilder(context)
+            .setListener(purchasesListener)
+            .enablePendingPurchases(
+                PendingPurchasesParams.newBuilder()
+                    .enableOneTimeProducts()
+                    .build()
+            )
+            .build()
 
-    override fun startConnection(listener: ConnectionListener) {
-        Thread {
-            billingClient.startConnection(object : BillingClientStateListener {
-                override fun onBillingServiceDisconnected() {
-                    Log.d("log_debugs", "GooglePlayBillingLibrary_onBillingServiceDisconnected: ")
-                    listener.onDisconnected()
+    private fun handlePurchasesUpdate(billingResult: BillingResult, purchases: List<Purchase>?) {
+        Log.d(
+            TAG, "onPurchasesUpdated: responseCode=${billingResult.responseCode}, " +
+                    "debugMessage=${billingResult.debugMessage}"
+        )
+
+        when (billingResult.responseCode) {
+            BillingClient.BillingResponseCode.OK -> {
+                if (purchases.isNullOrEmpty()) {
+                    Log.w(TAG, "Purchase success but list is empty")
+                    notifyListeners { it.onFailed(PurchaseResponseCode.ERROR) }
+                    return
                 }
 
-                override fun onBillingSetupFinished(billingResult: BillingResult) {
+                purchases.forEach { purchase ->
+                    this.purchases[purchase.purchaseToken] = purchase
                     Log.d(
-                        "log_debugs",
-                        "GooglePlayBillingLibrary_onBillingSetupFinished: ${billingResult.responseCode}"
+                        TAG, "Purchase successful: ${purchase.products}, " +
+                                "token=${purchase.purchaseToken}, " +
+                                "state=${purchase.purchaseState}"
                     )
-                    if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                        listener.onConnectionSuccess()
-                    } else {
-                        listener.onConnectionFailure()
+                }
+
+                notifyListeners { listener ->
+                    purchases.forEach { purchase ->
+                        listener.onSucceeded(purchase.toSalePurchase())
                     }
                 }
-            })
-        }.start()
+            }
+
+            BillingClient.BillingResponseCode.ITEM_ALREADY_OWNED -> {
+                Log.w(TAG, "Item already owned")
+                notifyListeners { it.onFailed(PurchaseResponseCode.ITEM_ALREADY_OWNED) }
+            }
+
+            BillingClient.BillingResponseCode.USER_CANCELED -> {
+                Log.d(TAG, "User canceled purchase")
+                notifyListeners { it.onFailed(PurchaseResponseCode.USER_CANCELED) }
+            }
+
+            else -> {
+                Log.e(
+                    TAG,
+                    "Purchase failed: ${billingResult.responseCode} - ${billingResult.debugMessage}"
+                )
+                notifyListeners { it.onFailed(PurchaseResponseCode.ERROR) }
+            }
+        }
     }
 
+    private inline fun notifyListeners(action: (OnPurchasesUpdatedListener) -> Unit) {
+        listeners.forEach { listener ->
+            try {
+                action(listener)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error notifying listener", e)
+            }
+        }
+    }
+
+    /**
+     * Establishes a connection to Google Play Billing.
+     *
+     * Should be called early (e.g., Application.onCreate or when billing is needed).
+     *
+     * @return Result<Unit>
+     *   - Success → connection established
+     *   - Failure → connection failed, check logs for BillingResponseCode
+     */
+    override fun startConnection(listener: ConnectionListener) {
+        if (billingClient.isReady) {
+            Log.d(TAG, "BillingClient already connected")
+            listener.onConnectionSuccess()
+            return
+        }
+
+
+        billingClient.startConnection(object : BillingClientStateListener {
+            override fun onBillingServiceDisconnected() {
+                Log.w(TAG, "Billing service disconnected")
+                isConnected = false
+                listener.onDisconnected()
+            }
+
+            override fun onBillingSetupFinished(billingResult: BillingResult) {
+                Log.d(
+                    TAG,
+                    "Billing setup finished: ${billingResult.responseCode} - ${billingResult.debugMessage}"
+                )
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    isConnected = true
+                    listener.onConnectionSuccess()
+                } else {
+                    isConnected = false
+                    listener.onConnectionFailure()
+                }
+            }
+        })
+    }
+
+    /**
+     * Queries product details from the Play Console.
+     *
+     * @param products A list of products to query (in-app products or subscriptions).
+     * @return List<ProductDetails> containing price, currency, sale info, subscription offers, etc.
+     *
+     * Notes:
+     * - Results are cached internally in [productMap]
+     * - Safe to call multiple times, as the latest data will overwrite cache
+     * - Always call [startConnection] before using this
+     */
     override fun queryProductDetails(
-        subs: List<String>, inApp: List<String>, onCompleted: (List<SaleProductDetail>) -> Unit
+        subs: List<String>,
+        inApp: List<String>,
+        onCompleted: (List<SaleProductDetail>) -> Unit
     ) {
-        var subsProductDetails: List<ProductDetails>? = null
-        var inAppProductDetails: List<ProductDetails>? = null
-        val latch = CountDownLatch(2) // Wait for 2 async tasks
+        if (!billingClient.isReady) {
+            Log.e(TAG, "BillingClient not ready")
+            onCompleted(emptyList())
+            return
+        }
 
-        // Query subscription products
-
-        if (subs.isEmpty()) {
-            latch.countDown() // Decrement the latch count
-        } else {
-            Thread {
-                val params = subs.map {
-                    QueryProductDetailsParams.Product.newBuilder().setProductId(it)
-                        .setProductType(BillingClient.ProductType.SUBS).build()
+        scope.launch {
+            try {
+                val subsDetails = if (subs.isNotEmpty()) {
+                    queryProductDetailsAsync(subs, BillingClient.ProductType.SUBS)
+                } else {
+                    emptyList()
                 }
-                val builder = QueryProductDetailsParams.newBuilder().setProductList(params).build()
-                billingClient.queryProductDetailsAsync(builder) { _, productDetails ->
-                    subsProductDetails = ArrayList(productDetails)
-                    latch.countDown() // Decrement the latch count
+
+                val inAppDetails = if (inApp.isNotEmpty()) {
+                    queryProductDetailsAsync(inApp, BillingClient.ProductType.INAPP)
+                } else {
+                    emptyList()
                 }
-            }.start()
-        }
 
-        if (inApp.isEmpty()) {
-            latch.countDown() // Decrement the latch count
-        } else {
-            // Query in-app products
-            Thread {
-                val params = inApp.map {
-                    QueryProductDetailsParams.Product.newBuilder().setProductId(it)
-                        .setProductType(BillingClient.ProductType.INAPP).build()
+                val allProducts = subsDetails + inAppDetails
+
+                val saleProductDetails = allProducts.map { productDetail ->
+                    detailProducts[productDetail.productId] = productDetail
+                    productDetail.toSaleProductDetail()
                 }
-                val builder = QueryProductDetailsParams.newBuilder().setProductList(params).build()
-                billingClient.queryProductDetailsAsync(builder) { _, productDetails ->
-                    inAppProductDetails = ArrayList(productDetails)
-                    latch.countDown() // Decrement the latch count
+
+                Log.d(TAG, "Query completed: ${saleProductDetails.size} products found")
+                saleProductDetails.forEach {
+                    Log.d(TAG, "Product: $it")
                 }
-            }.start()
-        }
 
-
-        // Wait for both queries to complete
-        latch.await()
-
-        // Combine the results
-        val allProducts = ArrayList<ProductDetails>()
-        subsProductDetails?.let { list ->
-            allProducts.addAll(list)
+                withContext(Dispatchers.Main) {
+                    onCompleted(saleProductDetails)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error querying product details", e)
+                withContext(Dispatchers.Main) {
+                    onCompleted(emptyList())
+                }
+            }
         }
-        inAppProductDetails?.let { list ->
-            allProducts.addAll(list)
-        }
-
-        // Convert to SaleProductDetail
-        val productDetails = ArrayList<SaleProductDetail>()
-        allProducts.forEach {
-            detailProducts[it.productId] = it
-            productDetails.add(it.toSaleProductDetail())
-        }
-
-        productDetails.forEach {
-            Log.d("log_debugs", "GooglePlayBillingLibrary_queryProductDetails: ${it}")
-        }
-        // Response productDetails
-        onCompleted(productDetails)
     }
 
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun queryProductDetailsAsync(
+        productIds: List<String>,
+        productType: String
+    ): List<ProductDetails> = suspendCancellableCoroutine { continuation ->
+        val params = productIds.map { productId ->
+            QueryProductDetailsParams.Product.newBuilder()
+                .setProductId(productId)
+                .setProductType(productType)
+                .build()
+        }
+
+        val queryParams = QueryProductDetailsParams.newBuilder()
+            .setProductList(params)
+            .build()
+
+        billingClient.queryProductDetailsAsync(queryParams) { billingResult, productDetailsList ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                continuation.resume(productDetailsList.productDetailsList) {}
+            } else {
+                Log.e(TAG, "Query $productType failed: ${billingResult.debugMessage}")
+                continuation.resume(emptyList()) {}
+            }
+        }
+    }
+
+    /**
+     * Queries all active purchases from Google Play.
+     *
+     * @return List<Purchase> including both INAPP and SUBS purchases
+     *
+     * Notes:
+     * - Purchases are cached internally in [purchaseMap]
+     * - Use this to restore purchases when a user reinstalls or changes device
+     */
     override fun queryPurchases(
         onCompleted: (List<SalePurchase>) -> Unit
     ) {
-        val latch = CountDownLatch(2) // Wait for 2 async tasks
-        var subs: List<Purchase>? = null
-        var inApp: List<Purchase>? = null
+        if (!billingClient.isReady) {
+            Log.e(TAG, "BillingClient not ready")
+            onCompleted(emptyList())
+            return
+        }
 
-        // Query subscription purchases
-        Thread {
-            val params =
-                QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.SUBS)
-            billingClient.queryPurchasesAsync(params.build()) { _, purchases ->
-                subs = ArrayList(purchases)
-                latch.countDown()
+        scope.launch {
+            try {
+                val subsPurchases = queryPurchasesAsync(BillingClient.ProductType.SUBS)
+                val inAppPurchases = queryPurchasesAsync(BillingClient.ProductType.INAPP)
+
+                val allPurchases = subsPurchases + inAppPurchases
+
+                val salePurchases = allPurchases.map { purchase ->
+                    purchases[purchase.purchaseToken] = purchase
+                    purchase.toSalePurchase()
+                }
+
+                Log.d(TAG, "Query purchases completed: ${salePurchases.size} purchases found")
+
+                withContext(Dispatchers.Main) {
+                    onCompleted(salePurchases)
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error querying purchases", e)
+                withContext(Dispatchers.Main) {
+                    onCompleted(emptyList())
+                }
             }
-        }.start()
-
-        // Query in-app purchases
-        Thread {
-            val params =
-                QueryPurchasesParams.newBuilder().setProductType(BillingClient.ProductType.INAPP)
-            billingClient.queryPurchasesAsync(params.build()) { _, purchases ->
-                inApp = ArrayList(purchases)
-                latch.countDown()
-            }
-        }.start()
-
-        // Wait for both queries to complete
-        latch.await()
-
-        // Combine the results
-        val allPurchases = ArrayList<Purchase>()
-        subs?.let { list ->
-            allPurchases.addAll(list)
         }
-        inApp?.let { list ->
-            allPurchases.addAll(list)
-        }
-
-        // Convert to SalePurchase
-        val salePurchases = ArrayList<SalePurchase>()
-        allPurchases.forEach {
-            purchases[it.purchaseToken] = it
-            salePurchases.add(it.toSalePurchase())
-        }
-
-        Log.d("log_debugs", "GooglePlayBillingLibrary_queryPurchases: ${salePurchases.size}")
-        // Response salePurchases
-        onCompleted(salePurchases)
     }
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private suspend fun queryPurchasesAsync(productType: String): List<Purchase> =
+        suspendCancellableCoroutine { continuation ->
+            val params = QueryPurchasesParams.newBuilder()
+                .setProductType(productType)
+                .build()
+
+            billingClient.queryPurchasesAsync(params) { billingResult, purchasesList ->
+                if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                    continuation.resume(purchasesList) {}
+                } else {
+                    Log.e(TAG, "Query $productType purchases failed: ${billingResult.debugMessage}")
+                    continuation.resume(emptyList()) {}
+                }
+            }
+        }
 
     override fun addListener(listener: OnPurchasesUpdatedListener) {
         listeners.add(listener)
+        Log.d(TAG, "Listener added, total: ${listeners.size}")
     }
 
     override fun removeListener(listener: OnPurchasesUpdatedListener) {
         listeners.remove(listener)
+        Log.d(TAG, "Listener removed, total: ${listeners.size}")
     }
 
+    /**
+     * Acknowledges or consumes a purchase after it has been successfully completed.
+     *
+     * @param purchase The [Purchase] to acknowledge or consume
+     *
+     * Notes:
+     * - Consumables → consumed so they can be purchased again
+     * - Non-consumables / subscriptions → acknowledged once, then permanently owned
+     * - Must be called within 3 days of the purchase, otherwise Play will auto-refund
+     */
     override fun onTransactionCompleted(salePurchase: SalePurchase, isConsume: Boolean) {
         val purchase = purchases[salePurchase.purchaseToken] ?: return
-        if (purchase.purchaseState == Purchase.PurchaseState.PURCHASED) {
-            if (!purchase.isAcknowledged) {
-                val acknowledgePurchaseParams =
-                    AcknowledgePurchaseParams.newBuilder().setPurchaseToken(purchase.purchaseToken)
-                billingClient.acknowledgePurchase(acknowledgePurchaseParams.build()) { billingResult ->
-                    if (isConsume && billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
-                        consumePurchase(purchase.purchaseToken)
-                    }
+        when (purchase.purchaseState) {
+            Purchase.PurchaseState.PURCHASED -> {
+                if (!purchase.isAcknowledged) {
+                    acknowledgePurchase(purchase, isConsume)
+                } else if (isConsume) {
+                    consumePurchase(purchase.purchaseToken)
                 }
+            }
+
+            Purchase.PurchaseState.PENDING -> {
+                Log.d(TAG, "Purchase pending: ${purchase.purchaseToken}")
+            }
+
+            Purchase.PurchaseState.UNSPECIFIED_STATE -> {
+                Log.w(TAG, "Purchase state unspecified: ${purchase.purchaseToken}")
+            }
+        }
+    }
+
+    private fun acknowledgePurchase(purchase: Purchase, shouldConsume: Boolean) {
+        val params = AcknowledgePurchaseParams.newBuilder()
+            .setPurchaseToken(purchase.purchaseToken)
+            .build()
+
+        billingClient.acknowledgePurchase(params) { billingResult ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                Log.d(TAG, "Purchase acknowledged: ${purchase.purchaseToken}")
+                if (shouldConsume) {
+                    consumePurchase(purchase.purchaseToken)
+                }
+            } else {
+                Log.e(TAG, "Acknowledge failed: ${billingResult.debugMessage}")
             }
         }
     }
@@ -246,25 +402,42 @@ class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
     private fun consumePurchase(purchaseToken: String) {
         val consumeParams =
             ConsumeParams.newBuilder().setPurchaseToken(purchaseToken).build()
-        billingClient.consumeAsync(consumeParams) { _, _ -> }
+        billingClient.consumeAsync(consumeParams) { billingResult, _ ->
+            if (billingResult.responseCode == BillingClient.BillingResponseCode.OK) {
+                Log.d(TAG, "Purchase consumed: $purchaseToken")
+                purchases.remove(purchaseToken)
+            } else {
+                Log.e(TAG, "Consume failed: ${billingResult.debugMessage}")
+            }
+        }
     }
 
+    /**
+     * Launches a billing flow for the given product.
+     *
+     * @param activity The Activity to use for launching the purchase UI
+     * @param productId The product ID defined in Play Console
+     *
+     * Notes:
+     * - If the product has multiple offers (e.g., subscription base plan + offer), use
+     *   the overload that accepts [SubscriptionOfferDetails]
+     * - Purchase results are received in [onPurchasesUpdated] and forwarded to listeners
+     */
     override fun purchase(activity: Activity, saleProductDetail: SaleProductDetail) {
         val productDetail: ProductDetails = detailProducts[saleProductDetail.productId] ?: return
 
         val productDetailsParamsList = when {
-            // Nếu là gói Subscription
-            saleProductDetail.subscriptionOfferDetails?.isNotEmpty() == true -> {
-                saleProductDetail.subscriptionOfferDetails.first().let {
-                    listOf(
-                        BillingFlowParams.ProductDetailsParams.newBuilder()
-                            .setProductDetails(productDetail)
-                            .setOfferToken(it.offerToken)
-                            .build()
-                    )
-                }
+            // Subscription product
+            !saleProductDetail.subscriptionOfferDetails.isNullOrEmpty() -> {
+                val offerToken = saleProductDetail.subscriptionOfferDetails.first().offerToken
+                listOf(
+                    BillingFlowParams.ProductDetailsParams.newBuilder()
+                        .setProductDetails(productDetail)
+                        .setOfferToken(offerToken)
+                        .build()
+                )
             }
-            // Nếu là gói Lifetime (One-time Purchase)
+            // One-time purchase product
             saleProductDetail.oneTimePurchaseOfferDetails != null -> {
                 listOf(
                     BillingFlowParams.ProductDetailsParams.newBuilder()
@@ -272,18 +445,13 @@ class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
                         .build()
                 )
             }
-            else -> null
-        }
 
-        if (productDetailsParamsList == null) {
-            Log.e("Billing", "Không tìm thấy thông tin sản phẩm")
-            return
+            else -> {
+                Log.e(TAG, "No valid offer details found")
+                return
+            }
         }
-
-        val billingFlowParams = BillingFlowParams.newBuilder()
-            .setProductDetailsParamsList(productDetailsParamsList)
-            .build()
-        billingClient.launchBillingFlow(activity, billingFlowParams)
+        launchBillingFlow(activity, productDetailsParamsList)
     }
 
     override fun purchase(
@@ -298,12 +466,30 @@ class GooglePlayBillingLibrary(context: Context) : BillingLibrary {
                 .setOfferToken(subscriptionOfferDetail.offerToken)
                 .build()
         )
+        launchBillingFlow(activity, productDetailsParamsList)
+    }
+
+    private fun launchBillingFlow(
+        activity: Activity,
+        productDetailsParamsList: List<BillingFlowParams.ProductDetailsParams>
+    ) {
         val billingFlowParams = BillingFlowParams.newBuilder()
             .setProductDetailsParamsList(productDetailsParamsList)
             .build()
-        billingClient.launchBillingFlow(activity, billingFlowParams)
+
+        val billingResult = billingClient.launchBillingFlow(activity, billingFlowParams)
+
+        if (billingResult.responseCode != BillingClient.BillingResponseCode.OK) {
+            Log.e(TAG, "Launch billing flow failed: ${billingResult.debugMessage}")
+        }
     }
 
+    /**
+     * Ends the connection to Google Play Billing.
+     *
+     * Should be called when billing is no longer needed (e.g., on app shutdown).
+     * Also clears all cached listeners and products to prevent memory leaks.
+     */
     override fun endConnection() {
         billingClient.endConnection()
     }
